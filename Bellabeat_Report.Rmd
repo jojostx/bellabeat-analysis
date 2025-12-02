@@ -1,0 +1,597 @@
+---
+title: "BellaBeat Analysis: Converting Casual Riders to Members"
+author: "Data Analysis Report"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: cosmo
+    highlight: tango
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, 
+                      fig.width = 10, fig.height = 6)
+```
+
+# Executive Summary
+
+This analysis examines usage patterns between annual members and casual riders of Cyclistic bike-share service using 2024 trip data. The primary objective is to identify behavioral differences to inform targeted marketing strategies for converting casual riders into annual members.
+
+Key findings reveal that members and casual riders demonstrate distinct usage patterns across multiple dimensions including trip frequency, duration, timing, bike preferences, and station locations. These insights provide actionable opportunities for tailored marketing campaigns.
+
+---
+
+# 1. Ask Phase
+
+## 1.1 Business Task
+
+The Cyclistic marketing team seeks to maximize annual memberships by converting casual riders into members. This analysis addresses the fundamental question: **How do annual members and casual riders use Cyclistic bikes differently?**
+
+## 1.2 Stakeholders
+
+- **Primary Stakeholders**: Lily Moreno (Director of Marketing), Cyclistic Executive Team
+- **Secondary Stakeholders**: Cyclistic Marketing Analytics Team
+
+## 1.3 Key Questions
+
+1. How do usage patterns differ between members and casual riders?
+2. What temporal trends (hourly, daily, monthly) distinguish the two user types?
+3. Which bike types do each group prefer?
+4. How do trip durations vary between members and casual riders?
+5. What are the most popular stations for each user type?
+
+---
+
+# 2. Prepare Phase
+
+## 2.1 Data Source
+
+The analysis utilizes Cyclistic's historical trip data for the year 2024, made available by Motivate International Inc. under [appropriate license](https://www.divvybikes.com/data-license-agreement).
+
+## 2.2 Data Description
+
+- **Format**: 12 monthly CSV files (January 2024 to December 2024)
+- **Storage Location**: `data/raw/` directory
+- **Column Structure**: 13 variables per ride record
+
+### Data Dictionary
+
+| Column Name | Description |
+|-------------|-------------|
+| ride_id | Unique identifier for each ride |
+| rideable_type | Type of bike (classic, electric, docked) |
+| started_at | Start date and timestamp |
+| ended_at | End date and timestamp |
+| start_station_name | Name of starting station |
+| start_station_id | ID of starting station |
+| end_station_name | Name of ending station |
+| end_station_id | ID of ending station |
+| start_lat | Starting latitude |
+| start_lng | Starting longitude |
+| end_lat | Ending latitude |
+| end_lng | Ending longitude |
+| member_casual | User type (member or casual) |
+
+## 2.3 Data Limitations
+
+- Station names and IDs contain missing values for some rides
+- Personal identifiable information is excluded for privacy protection
+- Cannot track individual riders across multiple trips
+
+---
+
+# 3. Process Phase
+
+## 3.1 Tools Used
+
+```{r libraries}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggridges)
+library(lubridate)
+library(forcats)
+library(vroom)
+library(janitor)
+library(here)
+library(knitr)
+library(scales)
+```
+
+## 3.2 Data Cleaning Process
+
+The data cleaning pipeline (`scripts/data_cyclistic.R`) performed the following operations:
+
+### 3.2.1 Data Loading
+
+```{r eval=FALSE}
+# Load all 12 monthly CSV files
+raw_files <- list.files(path = "data/raw/", 
+                        pattern = "*.csv", 
+                        full.names = TRUE)
+
+# Combine all files into single dataframe
+all_trips <- vroom(raw_files)
+```
+
+### 3.2.2 Data Transformation
+
+1. **Column Standardization**
+   - Cleaned column names using `janitor::clean_names()`
+   - Standardized `member_casual` values
+   - Standardized `rideable_type` values
+
+2. **Duplicate Removal**
+   - Removed duplicate `ride_id` entries
+
+3. **Data Validation**
+   - Removed rides with missing timestamps
+   - Removed rides with negative or zero duration
+   - Removed rides longer than 24 hours (potential data errors)
+
+4. **Feature Engineering**
+   - Created `ride_duration` (in minutes)
+   - Extracted `hour`, `day_of_week`, `month` from timestamps
+   - Created `period` variable (peak vs off-peak hours)
+   - Added `weekday_weekend` classification
+
+```{r eval=FALSE}
+# Example feature engineering code
+cyclistic_cleaned <- all_trips %>%
+  mutate(
+    ride_duration = as.numeric(difftime(ended_at, started_at, units = "mins")),
+    hour = hour(started_at),
+    day_of_week = wday(started_at, label = TRUE),
+    month = month(started_at, label = TRUE),
+    period = case_when(
+      hour >= 6 & hour < 10 ~ "Morning Peak",
+      hour >= 10 & hour < 16 ~ "Midday",
+      hour >= 16 & hour < 20 ~ "Evening Peak",
+      TRUE ~ "Off-Peak"
+    )
+  ) %>%
+  filter(
+    ride_duration > 0,
+    ride_duration < 1440  # Less than 24 hours
+  )
+```
+
+### 3.2.3 Data Output
+
+- **Cleaned Dataset**: `data/cleaned/cyclistic_2024_cleaned.csv`
+- **Analysis Outputs**: Multiple CSV files in `data/output/` directory
+
+---
+
+# 4. Analyze Phase
+
+## 4.1 Analysis Pipeline
+
+The analysis script (`scripts/analysis.R`) computed comprehensive metrics across multiple dimensions:
+
+### 4.1.1 Core Analyses Performed
+
+1. **Ride Duration Analysis**
+   - Distribution statistics by member type
+   - Duration buckets (0-15 min, 15-30 min, 30-60 min, 60+ min)
+
+2. **Temporal Analysis**
+   - Hourly ride patterns
+   - Daily ride patterns (by day of week)
+   - Monthly trends
+   - Peak vs off-peak usage
+
+3. **Bike Type Analysis**
+   - Usage by bike type (classic, electric, docked)
+   - Average duration by bike type
+
+4. **Station Analysis**
+   - Top 20 start stations by member type
+   - Top 20 end stations by member type
+   - Station classification (residential, commercial, mixed-use) using Gemini API
+
+### 4.1.2 Sample Analysis Code
+
+```{r eval=FALSE}
+# Example: Duration summary by member type
+duration_summary <- cyclistic_cleaned %>%
+  group_by(member_casual) %>%
+  summarise(
+    avg_duration = mean(ride_duration, na.rm = TRUE),
+    median_duration = median(ride_duration, na.rm = TRUE),
+    min_duration = min(ride_duration, na.rm = TRUE),
+    max_duration = max(ride_duration, na.rm = TRUE),
+    total_rides = n()
+  )
+
+# Example: Hourly patterns by member type
+hourly_patterns <- cyclistic_cleaned %>%
+  group_by(member_casual, hour) %>%
+  summarise(
+    ride_count = n(),
+    avg_duration = mean(ride_duration, na.rm = TRUE)
+  ) %>%
+  ungroup()
+```
+
+## 4.2 Key Findings Summary
+
+The analysis reveals several distinct behavioral patterns:
+
+1. **Frequency vs Duration Trade-off**
+   - Members: Higher ride frequency, shorter average duration
+   - Casual riders: Lower frequency, longer average duration
+
+2. **Temporal Patterns**
+   - Members: Strong weekday peaks during commute hours
+   - Casual riders: Higher activity on weekends
+
+3. **Bike Preferences**
+   - Casual riders: Prefer electric bikes
+   - Members: Prefer classic bikes
+
+4. **Station Patterns**
+   - Different station preferences indicate commuting vs recreational usage
+
+---
+
+# 5. Share Phase
+
+## 5.1 Visualization Strategy
+
+All visualizations were generated using `scripts/visualization.R` and stored in the `plots/` directory. The visualization approach focuses on clarity and actionable insights.
+
+## 5.2 Key Visualizations
+
+### 5.2.1 Monthly Trends
+
+```{r eval=FALSE}
+# Monthly ride counts by member type
+monthly_plot <- ggplot(monthly_by_member, 
+                       aes(x = month, y = ride_count, 
+                           fill = member_casual, group = member_casual)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Monthly Ride Patterns: Members vs Casual Riders",
+    subtitle = "2024 Cyclistic Bike-Share Data",
+    x = "Month",
+    y = "Number of Rides",
+    fill = "User Type"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+**Insight**: Members maintain consistent usage throughout the year, while casual riders show strong seasonality with peaks during summer months.
+
+### 5.2.2 Daily Patterns
+
+```{r eval=FALSE}
+# Daily ride patterns by day of week
+daily_plot <- ggplot(daily_by_member, 
+                     aes(x = day_of_week, y = ride_count, 
+                         fill = member_casual, group = member_casual)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Daily Ride Patterns: Members vs Casual Riders",
+    subtitle = "Rides by Day of Week",
+    x = "Day of Week",
+    y = "Number of Rides",
+    fill = "User Type"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+**Insight**: Members show classic commuter pattern with weekday peaks, while casual riders are most active on weekends.
+
+### 5.2.3 Hourly Distribution
+
+```{r eval=FALSE}
+# Hourly patterns showing commute peaks
+hourly_plot <- ggplot(hourly_by_member, 
+                      aes(x = hour, y = ride_count, 
+                          color = member_casual, group = member_casual)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Hourly Ride Distribution: Members vs Casual Riders",
+    subtitle = "Clear commute peaks for members",
+    x = "Hour of Day",
+    y = "Number of Rides",
+    color = "User Type"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+**Insight**: Members demonstrate clear morning (7-9 AM) and evening (4-6 PM) commute peaks. Casual riders show gradual increase throughout the day with afternoon peak.
+
+### 5.2.4 Bike Type Preferences
+
+```{r eval=FALSE}
+# Bike type usage by member type
+bike_type_plot <- ggplot(bike_behavior_by_member, 
+                         aes(x = rideable_type, y = ride_count, 
+                             fill = member_casual)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Bike Type Preferences: Members vs Casual Riders",
+    x = "Bike Type",
+    y = "Number of Rides",
+    fill = "User Type"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+**Insight**: Casual riders show strong preference for electric bikes, while members predominantly use classic bikes.
+
+### 5.2.5 Duration Distribution
+
+```{r eval=FALSE}
+# Ridge plot showing duration distributions
+duration_ridge <- ggplot(duration_data, 
+                         aes(x = ride_duration, y = member_casual, 
+                             fill = member_casual)) +
+  geom_density_ridges(alpha = 0.7) +
+  scale_x_continuous(limits = c(0, 60), breaks = seq(0, 60, 10)) +
+  labs(
+    title = "Ride Duration Distribution: Members vs Casual Riders",
+    subtitle = "Duration in minutes (limited to 60 for visibility)",
+    x = "Ride Duration (minutes)",
+    y = "User Type"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+**Insight**: Members cluster around shorter durations (5-15 minutes), while casual riders have broader distribution with longer average duration.
+
+### 5.2.6 Top Stations by Category
+
+```{r eval=FALSE}
+# Top start stations by location category
+station_plot <- ggplot(top_stations_classified %>% 
+                       filter(category != "Not Specified"), 
+                       aes(x = reorder(start_station_name, ride_count), 
+                           y = ride_count, 
+                           fill = category)) +
+  geom_col() +
+  coord_flip() +
+  facet_wrap(~member_casual, scales = "free_y") +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Top Start Stations by Location Type",
+    subtitle = "Residential vs Commercial patterns",
+    x = "Station Name",
+    y = "Number of Rides",
+    fill = "Location Type"
+  ) +
+  theme_minimal()
+```
+
+**Insight**: Members favor stations in residential areas (indicating commuting), while casual riders use stations in commercial and mixed-use areas (indicating recreational/tourist usage).
+
+### 5.2.7 Peak Period Distribution
+
+```{r eval=FALSE}
+# Peak vs off-peak ride distribution
+period_plot <- ggplot(period_by_member, 
+                      aes(x = period, y = ride_share, 
+                          fill = member_casual)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = percent_format()) +
+  labs(
+    title = "Peak Period Distribution: Members vs Casual Riders",
+    x = "Time Period",
+    y = "Share of Total Rides",
+    fill = "User Type"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+**Insight**: Members have higher concentration of rides during peak commute periods, confirming work-related travel patterns.
+
+---
+
+# 6. Act Phase
+
+## 6.1 Key Insights Summary
+
+Based on comprehensive analysis of 2024 Cyclistic bike-share data, the following behavioral differences have been identified:
+
+### Members
+- Use bikes primarily for commuting (weekday peaks, morning/evening rush hours)
+- Take shorter, more frequent trips
+- Prefer classic bikes
+- Consistent usage throughout the year
+- Start trips from residential areas
+
+### Casual Riders
+- Use bikes primarily for recreation (weekend peaks, midday hours)
+- Take longer, less frequent trips
+- Prefer electric bikes
+- Strong seasonal pattern (summer peak)
+- Start trips from commercial/tourist areas
+
+## 6.2 Recommendations
+
+### Strategy 1: Weekend to Weekday Conversion Campaign
+
+**Objective**: Encourage casual riders to adopt weekday commuting
+
+**Tactics**:
+- Offer "Commuter Trial" membership: First month at 50% discount for casual riders
+- Provide weekday bonus credits for the first 30 days
+- Create educational content highlighting cost savings for regular commuters
+- Target casual riders who have taken 3+ weekend rides in past month
+
+**Expected Impact**: Convert recreational users who live near bike stations into commuters
+
+### Strategy 2: Seasonal Membership Options
+
+**Objective**: Capture summer casual riders with flexible membership
+
+**Tactics**:
+- Introduce "Seasonal Pass" (April-September) at discounted annual rate
+- Offer upgrade path from seasonal to annual mid-season
+- Provide early bird discount for renewals
+- Market aggressively in March-April before summer season
+
+**Expected Impact**: Reduce barrier to entry for seasonal users, create pathway to annual membership
+
+### Strategy 3: Electric Bike Incentive Program
+
+**Objective**: Leverage casual riders' preference for electric bikes
+
+**Tactics**:
+- Offer members priority access to electric bikes during peak times
+- Create "Electric Bike Premium" membership tier
+- Provide unlimited electric bike minutes for annual members
+- Highlight electric bike availability as member benefit
+
+**Expected Impact**: Address primary bike preference of casual riders
+
+### Strategy 4: Station-Based Targeted Marketing
+
+**Objective**: Convert casual riders at high-traffic tourist/commercial stations
+
+**Tactics**:
+- Deploy digital advertising at top 20 casual rider stations
+- Offer on-site membership sign-up with instant activation
+- Create QR code campaigns with limited-time discounts
+- Partner with local businesses near popular casual stations for cross-promotion
+
+**Expected Impact**: Capture casual riders at point of decision
+
+### Strategy 5: Duration-Based Value Proposition
+
+**Objective**: Demonstrate cost savings for longer rides
+
+**Tactics**:
+- Create comparison calculator showing cost of casual vs member for typical usage
+- Highlight break-even point for membership (approximately 3-4 rides per month)
+- Offer "Length of Ride" guarantee: If annual members average longer rides than as casual riders, refund price difference
+- Send personalized emails to frequent casual riders with their annual cost projection
+
+**Expected Impact**: Convert high-frequency casual riders through financial incentive
+
+## 6.3 Success Metrics
+
+Track the following KPIs to measure campaign effectiveness:
+
+1. **Conversion Rate**: Casual to member conversion percentage
+2. **Membership Growth**: Monthly new member acquisitions
+3. **Retention Rate**: 12-month member retention
+4. **Usage Patterns**: Weekday usage increase among converted members
+5. **Revenue Impact**: Average revenue per user (ARPU) improvement
+6. **Campaign ROI**: Marketing spend vs new membership revenue
+
+## 6.4 Next Steps
+
+1. **Short-term (0-3 months)**
+   - Implement targeted email campaigns to high-frequency casual riders
+   - Launch weekend-to-weekday conversion pilot program
+   - Deploy station-based QR code campaigns at top 10 casual stations
+
+2. **Medium-term (3-6 months)**
+   - Analyze pilot program results and optimize messaging
+   - Introduce seasonal membership option ahead of summer
+   - Develop electric bike premium tier
+
+3. **Long-term (6-12 months)**
+   - Expand successful campaigns city-wide
+   - Develop mobile app features specifically for conversion
+   - Create member referral program incentivizing casual rider conversion
+
+---
+
+# 7. Technical Appendix
+
+## 7.1 Data Processing Pipeline
+
+```
+Raw Data (data/raw/)
+    ↓
+Data Cleaning (scripts/data_cyclistic.R)
+    ↓
+Cleaned Data (data/cleaned/cyclistic_2024_cleaned.csv)
+    ↓
+Analysis (scripts/analysis.R)
+    ↓
+Station Classification (scripts/python/address_classification.py)
+    ↓
+Analysis Outputs (data/output/*.csv)
+    ↓
+Visualization (scripts/visualization.R)
+    ↓
+Final Plots (plots/*.png)
+```
+
+## 7.2 Python Integration
+
+Station classification was performed using Google Gemini API to categorize top stations as:
+- Residential
+- Commercial
+- Mixed-use
+
+```{python eval=FALSE}
+# Example station classification
+import requests
+from dotenv import load_dotenv
+
+def classify_station(station_name, coordinates):
+    """Classify station using Gemini API"""
+    prompt = f"Classify this location as residential, commercial, or mixed-use: {station_name}"
+    # API call to Gemini
+    return classification
+```
+
+## 7.3 Code Repository
+
+Complete analysis code available at: [GitHub Repository](https://github.com/jojostx/cyclistic-bike-share-analysis)
+
+**Repository Structure**:
+- `/data/raw/` - Raw monthly CSV files
+- `/data/cleaned/` - Processed dataset
+- `/data/output/` - Analysis results
+- `/scripts/` - R analysis scripts
+- `/scripts/python/` - Python classification script
+- `/plots/` - Generated visualizations
+
+---
+
+# 8. Conclusion
+
+This comprehensive analysis of Cyclistic bike-share data reveals clear, actionable differences between member and casual rider behavior. Members demonstrate commuter-focused patterns with consistent weekday usage, shorter trips, and residential station preferences. Casual riders show recreational patterns with weekend peaks, longer durations, and tourist-area station usage.
+
+The recommended five-pronged marketing strategy leverages these insights to create targeted conversion campaigns. By addressing the specific needs and behaviors of casual riders through weekend-to-weekday programs, seasonal options, electric bike incentives, station-based marketing, and value-based messaging, Cyclistic can effectively convert casual riders into profitable annual members.
+
+Implementation of these recommendations, coupled with rigorous tracking of success metrics, will position Cyclistic to achieve its goal of maximizing annual memberships and ensuring long-term business growth.
+
+---
+
+# References
+
+- Cyclistic trip data provided by Motivate International Inc.
+- Data analysis performed using R 4.x and tidyverse packages
+- Visualizations created with ggplot2
+- Station classification using Google Gemini API
+
+---
+
+**Report Generated**: `r Sys.Date()`
+
+**Analysis Period**: January 2024 - December 2024
+
+**Total Rides Analyzed**: See data/output/member_stats.csv for complete statistics
