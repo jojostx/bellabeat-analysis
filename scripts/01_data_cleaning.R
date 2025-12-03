@@ -1,4 +1,9 @@
-# Purpose: Load, clean, and combine all raw Bellabeat 2016 CSV files
+# data_cleaning.R
+# ============================================================
+# purpose: data cleaning - bellabeat 2016
+# author:  Onyedikachi Ikuru
+# date:    12-01-2025
+# ============================================================
 
 # -------------------------------------------------------------------------
 # Libraries
