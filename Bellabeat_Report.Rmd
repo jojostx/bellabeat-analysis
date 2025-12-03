@@ -163,7 +163,7 @@ cyclistic_cleaned <- all_trips %>%
 ### 3.2.3 Data Output
 
 - **Cleaned Dataset**: `data/cleaned/cyclistic_2024_cleaned.csv`
-- **Analysis Outputs**: Multiple CSV files in `data/output/` directory
+- **Analysis Outputs**: Multiple CSV files in `data/processed/` directory
 
 ---
 
@@ -531,7 +531,7 @@ Analysis (scripts/analysis.R)
     ↓
 Station Classification (scripts/python/address_classification.py)
     ↓
-Analysis Outputs (data/output/*.csv)
+Analysis Outputs (data/processed/*.csv)
     ↓
 Visualization (scripts/visualization.R)
     ↓
@@ -564,7 +564,7 @@ Complete analysis code available at: [GitHub Repository](https://github.com/jojo
 **Repository Structure**:
 - `/data/raw/` - Raw monthly CSV files
 - `/data/cleaned/` - Processed dataset
-- `/data/output/` - Analysis results
+- `/data/processed/` - Analysis results
 - `/scripts/` - R analysis scripts
 - `/scripts/python/` - Python classification script
 - `/plots/` - Generated visualizations
@@ -594,4 +594,4 @@ Implementation of these recommendations, coupled with rigorous tracking of succe
 
 **Analysis Period**: January 2024 - December 2024
 
-**Total Rides Analyzed**: See data/output/member_stats.csv for complete statistics
+**Total Rides Analyzed**: See data/processed/member_stats.csv for complete statistics
