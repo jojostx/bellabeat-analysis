@@ -1,0 +1,5 @@
+metric,value,interpretation
+Peak Activity Hour,7,Best time for activity notifications
+Users Meeting 10k Steps (50%+ days),30.3%,"Percentage of engaged, active users"
+Week 8 Retention Rate,78.8%,Users still active after 8 weeks
+Users with Adequate Sleep (50%+ days),29.2%,Users getting healthy 7-9h sleep

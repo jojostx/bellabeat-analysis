@@ -1,0 +1,11 @@
+relationship,correlation,interpretation
+Steps → Calories,0.5915680862453356,Moderate
+Very Active Minutes → Calories,0.6158382682703379,Moderate
+Total Active Minutes → Calories,0.4719974625368184,Moderate
+Sedentary Minutes → Calories,-0.10697304768018766,Very Weak
+Distance → Calories,0.6449618727902221,Moderate
+Steps → Distance,0.9853688431626575,Strong
+Steps → Sleep Duration,-0.19034391666763167,Very Weak
+Very Active Minutes → Sleep Duration,-0.08812657953070492,Very Weak
+Steps → Sleep Efficiency,-0.11002553808160036,Very Weak
+Very Active Minutes → Sleep Efficiency,0.061687267591280064,Very Weak

@@ -1,0 +1,3 @@
+avg_sleep_hours,median_sleep_hours,sd_sleep_hours,avg_time_in_bed,avg_sleep_efficiency,avg_time_awake,metric_type,avg_consistency
+6.986219512195122,7.208333333333334,1.9772652930683865,7.641382113821138,0.916466708010419,39.30975609756098,overall,NA
+NA,NA,NA,NA,NA,NA,consistency,1.7013043763076452
