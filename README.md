@@ -1,4 +1,5 @@
 # Bellabeat Analysis (2016)
+![bellabeat logo](/Bellabeat-logo.png)
 
 ## Objective
 Analyze FitBit fitness tracker data from 30 users to understand activity patterns, sleep behavior, and feature utilization to inform Bellabeat's marketing strategy and product development.
@@ -15,58 +16,8 @@ This outlines the main directories and files used in the Bellabeat analysis pipe
 Bellabeat-Analysis/
 ├── data/
 │   ├── raw/                  # Raw CSV files (18 files, Input Data)
-│   │   ├── dailyActivity_merged.csv
-│   │   ├── dailyCalories_merged.csv
-│   │   ├── dailyIntensities_merged.csv
-│   │   ├── dailySteps_merged.csv
-│   │   ├── sleepDay_merged.csv
-│   │   ├── weightLogInfo_merged.csv
-│   │   ├── hourlyCalories_merged.csv
-│   │   ├── hourlyIntensities_merged.csv
-│   │   ├── hourlySteps_merged.csv
-│   │   ├── heartrate_seconds_merged.csv
-│   │   ├── minuteCaloriesNarrow_merged.csv
-│   │   ├── minuteCaloriesWide_merged.csv
-│   │   ├── minuteIntensitiesNarrow_merged.csv
-│   │   ├── minuteIntensitiesWide_merged.csv
-│   │   ├── minuteStepsNarrow_merged.csv
-│   │   ├── minuteStepsWide_merged.csv
-│   │   ├── minuteSleep_merged.csv
-│   │   └── minuteMETsNarrow_merged.csv
 │   ├── cleaned/              # Cleaned individual datasets (18 files)
-│   │   ├── daily_activities_cleaned.csv
-│   │   ├── daily_calories_cleaned.csv
-│   │   ├── daily_intensities_cleaned.csv
-│   │   ├── daily_steps_cleaned.csv
-│   │   ├── sleep_day_cleaned.csv
-│   │   ├── weight_log_cleaned.csv
-│   │   ├── hourly_calories_cleaned.csv
-│   │   ├── hourly_intensities_cleaned.csv
-│   │   ├── hourly_steps_cleaned.csv
-│   │   ├── heartrate_seconds_cleaned.csv
-│   │   ├── minute_calories_narrow_cleaned.csv
-│   │   ├── minute_calories_wide_cleaned.csv
-│   │   ├── minute_intensities_narrow_cleaned.csv
-│   │   ├── minute_intensities_wide_cleaned.csv
-│   │   ├── minute_steps_narrow_cleaned.csv
-│   │   ├── minute_steps_wide_cleaned.csv
-│   │   ├── minute_sleep_cleaned.csv
-│   │   └── minute_mets_narrow_cleaned.csv
 │   ├── processed/            # Analysis output CSVs (Input for visualization.R)
-│   │   ├── users_per_dataset.csv
-│   │   ├── user_engagement.csv
-│   │   ├── user_segments.csv
-│   │   ├── feature_utilization_matrix.csv
-│   │   ├── feature_summary.csv
-│   │   ├── correlation_matrix.csv
-│   │   ├── key_correlations.csv
-│   │   ├── hourly_activity_summary.csv
-│   │   ├── daily_averages_by_dow.csv
-│   │   ├── weekly_trends.csv
-│   │   ├── sleep_analysis.csv
-│   │   ├── user_sleep_consistency.csv
-│   │   ├── business_insights.csv
-│   │   └── ... (other intermediate CSVs)
 │   └── output/               # Exploration outputs (optional)
 ├── plots/                    # Generated PNG visualizations (20 plots)
 │   ├── 01_users_per_dataset.png

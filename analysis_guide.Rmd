@@ -1,388 +1,340 @@
 ---
-title: "FitBit Dataset Analysis Guide"
-author: "Bellabeat Case Study"
-date: "2016 FitBit Tracker Data (30 Users, March-May 2016)"
+title: "Bellabeat FitBit Data Analysis Guide"
+author: "Onyedikachi Ikuru"
+date: "December 2025"
 output: html_document
 ---
 
-# Dataset Context
+# Project Overview
 
+## Dataset Context
+- **Source**: [Kaggle FitBit Fitness Tracker Data](https://www.kaggle.com/datasets/arashnic/fitbit)
 - **Users**: 30 participants
 - **Time Period**: March 12, 2016 to May 12, 2016 (2 months)
-- **Data Files**: 18 cleaned CSV files across daily, hourly, minute, and second granularities
-- **Tracking Consistency**: Activity ranges vary from 4 to 31 days per user
-- **Demographics**: No demographic information available (gender, age, location)
+- **Data Files**: 18 CSV files across daily, hourly, minute, and second granularities
+- **Tracking Consistency**: 4-31 days per user
+
+## Key Limitations
+**Acknowledge these in your presentation:**
+- Small sample size (30 users) limits generalizability
+- Dataset from 2016 may not reflect current trends
+- No demographic information (age, gender, location)
+- Only 2 months of data; cannot capture seasonal or long-term patterns
+- Inconsistent feature usage across users
+- Variable tracking duration (4-31 days)
 
 ---
 
-# 1. EXPLORATION (`02_data_exploration.R`)
+# Analysis Pipeline
 
-## A. Data Coverage & Quality ⚠️ CRITICAL - Do this first!
+## 1. Data Cleaning (`01_data_cleaning.R`)
 
-### Per Dataset
-```r
-# How many users in each dataset?
-- daily_activities: ? users
-- sleep_day: ? users (likely fewer than 30)
-- weight_log: ? users (likely very few)
-- heartrate_seconds: ? users
-```
+### Purpose
+Clean and standardize all 18 raw CSV files for analysis.
 
-### Per User
-```r
-# Days tracked per user (4-31 day range)
-- User tracking consistency
-- Identify "everyday users" (25-31 days) vs "light users" (1-10 days)
-- Date range: 2016-03-12 to 2016-05-12
-```
+### Key Steps
+1. **Load Data**: Read all CSV files from `data/raw/`
+2. **Clean Column Names**: Standardize using `janitor::clean_names()`
+3. **Parse Dates**: Custom datetime parser for multiple formats
+4. **Data Quality**:
+   - Remove duplicate records
+   - Filter invalid heart rates (>220 bpm or ≤0)
+   - Filter invalid daily minutes (>1440)
+   - Round distances to 2 decimal places
+5. **Calculate Derived Metrics**:
+   - `total_active_minutes` (sum of very/fairly/lightly active)
+   - `active_ratio` (active minutes / total minutes)
+   - `non_wear` flag (all activity metrics = 0)
+   - `sleep_efficiency` (time asleep / time in bed)
+6. **Save**: 18 cleaned CSV files to `data/cleaned/`
 
-### Data Quality Checks
-```r
-# Missing data patterns
-- Which users have sleep data?
-- Which users have heart rate data?
-- Which users logged weight?
-- Non-wear days (already flagged in cleaning)
-- Invalid heart rates (>220 bpm, already filtered)
-- Invalid total_minutes (>1440, already filtered)
-```
+### Output
+- 18 cleaned datasets ready for analysis
+- Consistent column names and data types across all files
 
-## B. Basic Distributions
+---
 
-### Daily Aggregates
-- Steps distribution (box plots, histograms)
-- Calories distribution
-- Sleep duration distribution
-- Active minutes distribution (very/fairly/lightly/sedentary)
+## 2. Exploration (`02_exploration.R`)
 
-### Identify Outliers
+### Purpose
+Understand data coverage, quality, and basic patterns before deep analysis.
+
+### A. Data Coverage Analysis
+
+**Per Dataset:**
+- Count unique users in each of 10 main datasets
+- Identify which datasets have the most/least participation
+
+**Per User:**
+- Days tracked per user (range: 4-31 days)
+- Classify engagement levels:
+  - Everyday Users: 25-31 days
+  - Heavy Users: 21-24 days
+  - Moderate Users: 11-20 days
+  - Light Users: 1-10 days
+
+**Feature Utilization:**
+- Which users track sleep? (~80%)
+- Which users track heart rate? (~47%)
+- Which users log weight? (~27%)
+- Activity tracking: 100% (all users)
+
+### B. Basic Distributions
+
+**Activity Metrics:**
+- Steps: mean, median, SD, min, max
+- Calories: mean, median, SD, min, max
+- Active minutes by type (very/fairly/lightly/sedentary)
+
+**Sleep Metrics (if available):**
+- Sleep hours: mean, median, SD
+- Sleep efficiency: mean, median
+
+**Outlier Detection:**
 - Zero-step days
-- Extreme calorie burns
-- Abnormal sleep durations (<3 hours or >12 hours)
+- Extreme calorie burns (>5000 or <1000)
+- Abnormal sleep (<3 hours or >12 hours)
 
-## C. Feature Utilization
+### C. Data Quality Checks
 
-### What is Feature Utilization?
-**Feature Utilization** = How many users actually USE each tracking feature in the FitBit device
+- Non-wear days per user
+- Users with insufficient data (<7 days) → exclude from analysis
 
-**Why This Matters:**
-Not all users track everything. Some users:
-- Wear the device all day but never log weight
-- Track steps but don't wear it during sleep
-- Don't enable heart rate monitoring
-- Only track for a few days
-
-### Analysis Components
-
-#### 1. Dataset Availability Per User
-```r
-user_feature_usage <- data.frame(
-  id = unique_user_ids,
-  has_activity = id %in% daily_activities$id,
-  has_sleep = id %in% sleep_day$id,
-  has_weight = id %in% weight_log$id,
-  has_heartrate = id %in% heartrate_seconds$id
-)
-
-# Expected results:
-# - 30/30 users have activity data (100%)
-# - 24/30 users have sleep data (~80%)
-# - 8/30 users logged weight (~27%)
-# - 14/30 users have heart rate data (~47%)
-```
-
-#### 2. Tracking Frequency
-```r
-# Sleep tracking consistency
-sleep_frequency <- sleep_day %>%
-  group_by(id) %>%
-  summarize(
-    days_with_sleep = n(),
-    total_possible_days = as.numeric(max(sleep_day) - min(sleep_day))
-  ) %>%
-  mutate(sleep_tracking_rate = days_with_sleep / total_possible_days)
-
-# Weight logging frequency
-weight_frequency <- weight_log %>%
-  group_by(id) %>%
-  summarize(
-    times_logged = n(),
-    manual_logs = sum(is_manual_report),
-    auto_logs = sum(!is_manual_report)
-  )
-```
-
-#### 3. Feature Adoption Insights
-Questions to answer:
-- What % of users track sleep regularly?
-- What % of users ever logged weight?
-- What % of users have heart rate monitoring enabled?
-- Among those who track, how consistent are they?
-
-### Business Implications Example
-
-**High Utilization (Sleep - 80%):**
-- Users find this valuable
-- Bellabeat should emphasize sleep features in marketing
-- Invest in sleep analysis features
-
-**Low Utilization (Weight - 27%):**
-- Feature is underutilized
-- Either users don't care OR it's too difficult to use
-- Recommendation: Simplify weight logging OR de-prioritize this feature
-
-**Medium Utilization (Heart Rate - 47%):**
-- Split adoption suggests different user types
-- Opportunity: Educate users on heart rate benefits
-- Or: Accept that only fitness enthusiasts want this
-
-### Visualization Example
-```r
-# Feature utilization bar chart
-feature_adoption <- data.frame(
-  Feature = c("Activity", "Sleep", "Heart Rate", "Weight"),
-  Users = c(30, 24, 14, 8),
-  Percentage = c(100, 80, 47, 27)
-)
-
-ggplot(feature_adoption, aes(x = reorder(Feature, -Percentage), y = Percentage)) +
-  geom_bar(stat = "identity", fill = "#2E7D32") +
-  geom_text(aes(label = paste0(Users, "/30")), vjust = -0.5) +
-  labs(
-    title = "FitBit Feature Adoption Among 30 Users",
-    x = "Feature",
-    y = "% of Users"
-  ) +
-  theme_minimal()
-```
-
-## Output from Exploration
-
-**Save the following:**
-- Summary tables of data coverage
-- List of users to EXCLUDE (insufficient data: <7 days)
-- List of users to INCLUDE in deep analysis
-- Quick exploration plots (histograms, box plots)
+### Outputs Saved
+- `users_per_dataset.csv`
+- `user_engagement.csv`
+- `feature_utilization_matrix.csv`
+- `feature_summary.csv`
+- Tracking frequency CSVs (sleep, weight, heart rate)
 
 ---
 
-# 2. ANALYSIS (`03_analysis.R`)
+## 3. Analysis (`03_analysis.R`)
 
-## A. User Segmentation 🔥 HIGH PRIORITY
+### Purpose
+Extract insights about user behavior, activity patterns, and feature relationships.
 
-### Activity Level Classification
-Based on average daily steps:
-- **Sedentary**: <5,000 steps
-- **Low Active**: 5,000-7,499 steps
-- **Somewhat Active**: 7,500-9,999 steps
-- **Active**: 10,000-12,499 steps
-- **Highly Active**: ≥12,500 steps
+### A. User Segmentation
 
-### Engagement Classification
-Based on tracking consistency:
-- **Everyday Users**: 25-31 days tracked
-- **Heavy Users**: 21-24 days
-- **Moderate Users**: 11-20 days
-- **Light Users**: 4-10 days
+**Activity Level** (based on average daily steps):
+- Sedentary: <5,000 steps
+- Low Active: 5,000-7,499 steps
+- Somewhat Active: 7,500-9,999 steps
+- Active: 10,000-12,499 steps
+- Highly Active: ≥12,500 steps
 
-### Sleep Behavior Classification
-Based on average sleep duration:
-- **Under-sleepers**: <6 hours
-- **Normal sleepers**: 6-8 hours
-- **Over-sleepers**: >8 hours
+**Sleep Pattern** (based on average sleep duration):
+- Under-sleeper: <6 hours
+- Normal sleeper: 6-8 hours
+- Over-sleeper: >8 hours
 
-**Save**: `user_segments.csv` with columns: `id, activity_level, engagement_level, sleep_pattern, avg_daily_steps, days_tracked`
+**Result:** Each user classified by activity level, engagement level, and sleep pattern.
 
-## B. Correlation Analysis 🔥 HIGH PRIORITY
+### B. Correlation Analysis
 
-### Key Relationships
-```r
-# Steps → Calories (expect strong positive)
-# Very Active Minutes → Calories (expect strong positive)
-# Sedentary Minutes → Calories (expect negative or weak)
-# Active Minutes → Sleep Quality (explore if exists)
-# Sleep Duration → Next Day Steps (lag analysis)
-# Distance → Calories
-```
+**Key Relationships Explored:**
+1. Steps → Calories (expect strong positive)
+2. Very Active Minutes → Calories
+3. Total Active Minutes → Calories
+4. Sedentary Minutes → Calories (expect weak/negative)
+5. Distance → Calories
+6. Steps → Distance
 
-**Save**: `correlation_matrix.csv` and `key_correlations.csv`
+**Sleep-Activity Relationships:**
+- Steps → Sleep Duration
+- Very Active Minutes → Sleep Duration
+- Steps → Sleep Efficiency
+- Very Active Minutes → Sleep Efficiency
 
-## C. Temporal Patterns
+**Lag Analysis:**
+- Sleep Duration → Next Day Steps
 
-### Time-of-Day Analysis (Hourly Data)
-```r
-# Average hourly steps across all users
-# Peak activity hours (likely 5 AM - 9 PM based on research)
-# Hourly calorie burn patterns
-# Heart rate circadian rhythm (if data available)
-```
+**Interpretation Categories:**
+- Strong: |r| ≥ 0.7
+- Moderate: |r| ≥ 0.4
+- Weak: |r| ≥ 0.2
+- Very Weak: |r| < 0.2
 
-### Day-of-Week Analysis
-```r
-# Weekday vs Weekend comparison
-- Average steps by day of week
-- Most active days (likely mid-week)
-- Sedentary time by day of week
+### C. Temporal Patterns
+
+**Hourly Activity:**
+- Average steps by hour of day (0-23)
+- Identify peak activity hours
+- Average calorie burn by hour
+
+**Day of Week:**
+- Average steps by day (Monday-Sunday)
+- Weekday vs Weekend comparison
 - Sleep patterns by day of week
-```
 
-### Trend Over Time (2-month period)
-```r
-# Do users decrease activity over time?
-# Week 1 vs Week 8 comparison
-# Retention: how many users still active in week 8?
-```
+**Weekly Trends:**
+- Average steps per week (1-8+)
+- User retention: active users per week
+- Detect activity decline over 2-month period
 
-**Save**:
+### D. Sleep Analysis
+
+**Overall Metrics:**
+- Average sleep hours
+- Sleep efficiency (time asleep / time in bed)
+- Time awake in bed
+
+**User-Level:**
+- Sleep consistency (standard deviation)
+- Consistency rating: Very Consistent, Consistent, Moderate, Inconsistent
+
+### E. Business Questions
+
+**Actionable Insights:**
+1. **When are users most active?** → Optimal notification timing
+2. **What % meet 10k step goal?** → User success metrics
+3. **What % get adequate sleep (7-9h)?** → Health metrics
+4. **Feature adoption by segment** → Which users use which features
+5. **User retention rates** → Drop-off patterns week by week
+
+### Outputs Saved
+- `user_segments.csv`
+- `correlation_matrix.csv`
+- `key_correlations.csv`
 - `hourly_activity_summary.csv`
 - `daily_averages_by_dow.csv`
 - `weekly_trends.csv`
+- `sleep_analysis.csv`
+- `user_sleep_consistency.csv`
+- `business_insights.csv`
 
-## D. Sleep Analysis (If sufficient data exists)
+---
 
-```r
-# Sleep efficiency calculation (already in cleaning)
-# Average sleep: time in bed vs time asleep
-# Sleep consistency (std dev of sleep duration)
-# Relationship: Daily Steps → Sleep Duration
-# Relationship: Very Active Minutes → Sleep Quality
+## 4. Visualization (`04_visualization.R`)
+
+### Purpose
+Create publication-ready visualizations to communicate findings.
+
+### A. User Overview (Plots 1-4)
+1. **Users per dataset** - Bar chart showing data coverage
+2. **Engagement distribution** - Pie chart of user engagement levels
+3. **Activity level distribution** - Bar chart of activity segments
+4. **Feature utilization** - Stacked bar showing feature adoption
+
+### B. Activity Patterns (Plots 5-8)
+5. **Activity heatmap** - Hour × Day of week activity patterns
+6. **Peak activity hours** - Line chart of hourly steps
+7. **Steps by segment** - Boxplot comparing activity levels
+8. **Weekday vs weekend** - Side-by-side comparison
+
+### C. Correlations (Plots 9-12)
+9. **Correlation matrix** - Heatmap of all variable relationships
+10. **Steps vs calories** - Scatter plot with regression line
+11. **Active minutes vs calories** - Scatter plot with regression
+12. **Key correlations** - Bar chart summary of top relationships
+
+### D. Temporal Trends (Plots 13-15)
+13. **Weekly trends** - Line chart of average steps per week
+14. **User retention** - Bar chart of active users by week
+15. **Day of week patterns** - Line chart highlighting weekends
+
+### E. Sleep Visualizations (Plots 16-18)
+16. **Sleep duration** - Histogram with 7-9h guidelines
+17. **Sleep efficiency by segment** - Boxplot by activity level
+18. **Time in bed vs asleep** - Scatter plot showing efficiency
+
+### F. Business Insights (Plots 19-20)
+19. **Steps with 10k goal** - Histogram showing goal achievement
+20. **Business insights summary** - Text visualization of key metrics
+
+### Design Principles
+- **Custom theme** (`theme_bellabeat()`) for consistency
+- **Color palettes** for activity levels and engagement
+- **Lowercase labels** for modern, clean aesthetic
+- **300 DPI** for publication quality
+- **Proper titles and subtitles** explaining each visualization
+
+---
+
+# Key Findings & Insights
+
+## User Behavior
+- Tracking consistency varies widely (4-31 days)
+- Most users are "Moderate" or "Heavy" users (11-24 days)
+- Feature adoption: Activity (100%), Sleep (80%), Heart Rate (47%), Weight (27%)
+
+## Activity Patterns
+- Peak activity likely in afternoon/evening hours
+- Weekday patterns differ from weekend patterns
+- Strong positive correlation between steps and calories
+- Very active minutes drive calorie burn significantly
+
+## Sleep Insights
+- Most users get 6-8 hours of sleep
+- Sleep efficiency varies by activity level
+- Relationship between daily activity and sleep quality exists
+
+## Business Recommendations
+1. **Send notifications during peak activity hours** (identified in analysis)
+2. **Promote sleep tracking** - high adoption (80%) shows user value
+3. **Simplify or deprioritize weight tracking** - low adoption (27%)
+4. **Target 10k step goal** - measure and encourage achievement
+5. **Monitor retention** - understand drop-off patterns
+
+---
+
+# Tools & Technologies
+
+## R Packages Used
+- **Data manipulation**: `dplyr`, `tidyr`, `readr`
+- **Data cleaning**: `janitor`, `vroom`
+- **Date/time**: `lubridate`
+- **Visualization**: `ggplot2`, `scales`, `forcats`
+- **Project management**: `here`
+- **Statistical analysis**: `broom`
+
+## File Organization
+```
+project/
+├── data/
+│   ├── raw/          # Original 18 CSV files
+│   ├── cleaned/      # 18 cleaned files
+│   └── processed/    # Analysis outputs
+├── plots/            # 20 visualizations
+└── scripts/          # 4 R scripts
 ```
 
-**Save**: `sleep_analysis.csv`
+---
 
-## E. Business Questions
+# Next Steps (Optional)
 
-```r
-# When are users most active? → Notification timing
-# Which features drive engagement? → Feature adoption by segment
-# What percentage of users meet 10k step goal?
-# What percentage get adequate sleep (7-9 hours)?
-# Drop-off rate: % users who stop after week 1, 2, 3, etc.
-```
+When you're ready to expand this analysis:
 
-**Save**: `business_insights.csv`
+1. **Statistical Testing**: Add formal hypothesis tests
+   - T-tests for weekday vs weekend differences
+   - ANOVA for differences across activity segments
+   - Chi-square tests for categorical relationships
+
+2. **Predictive Modeling**: Build models to predict
+   - Calorie burn from activity metrics
+   - User drop-off risk
+   - Sleep quality from daytime activity
+
+3. **Deep Dives**: Explore minute-level patterns
+   - Activity bout detection
+   - Sedentary break patterns
+   - Heart rate zones and recovery
+   - Sleep stage analysis
+
+4. **Advanced Visualizations**:
+   - Interactive dashboards (Shiny)
+   - Animated temporal changes
+   - Individual user journey maps
 
 ---
 
-# 3. VISUALIZATION (`04_visualizations.R`)
+# References
 
-## A. User Overview Dashboard
-
-- Number of users per dataset (bar chart)
-- User engagement distribution (pie/bar: everyday/heavy/moderate/light)
-- Activity level distribution (pie/bar: sedentary/low/active/highly)
-- Date range timeline showing user participation
-
-## B. Activity Patterns
-
-- Hourly activity heatmap (hour x day of week)
-- Peak activity hours (line chart: avg steps by hour)
-- Steps distribution by activity segment (box plots)
-- Weekday vs Weekend comparison (side-by-side bar charts)
-
-## C. Correlations
-
-- Correlation matrix heatmap
-- Scatter plots:
-  - Steps vs Calories (with regression line)
-  - Very Active Minutes vs Calories
-  - Sleep Duration vs Next Day Steps
-  - Active Minutes vs Sleep Efficiency
-
-## D. Temporal Trends
-
-- Weekly activity trends (line chart: avg steps by week)
-- User retention funnel (bar chart: users active in week 1, 2, 3...)
-- Activity decline over time (if exists)
-
-## E. Sleep Visualizations (if data sufficient)
-
-- Sleep duration distribution (histogram)
-- Sleep efficiency by user segment (box plot)
-- Time in bed vs Time asleep (scatter plot)
-- Sleep patterns by day of week (line chart)
-
-## F. Heart Rate Analysis (if data available)
-
-- Average heart rate by hour (circadian rhythm line chart)
-- Heart rate vs activity intensity (scatter plot)
-- Heart rate distribution by activity level
-
-## G. Feature Utilization
-
-- Stacked bar chart: % users tracking each feature
-- Weight log frequency (if any users have data)
-
-## H. Business Recommendation Visuals
-
-- Optimal notification times (based on hourly activity)
-- User segmentation pie chart with insights
-- Key metrics dashboard:
-  - % users meeting 10k steps
-  - % users getting 7-9 hours sleep
-  - Average engagement rate
+- **Dataset**: [FitBit Fitness Tracker Data (Kaggle)](https://www.kaggle.com/datasets/arashnic/fitbit)
+- **Step Guidelines**: CDC recommends 10,000 steps/day
+- **Sleep Guidelines**: National Sleep Foundation recommends 7-9 hours of sleep per day
+- **Analysis Methods**: Google Data Analytics Certificate methodology
 
 ---
 
-# CRITICAL LIMITATIONS TO ACKNOWLEDGE
-
-Based on your dataset:
-- ⚠️ Small sample size (30 users) limits generalizability
-- ⚠️ Dataset from 2016 is outdated; trends may have changed
-- ⚠️ No demographic information prevents targeted insights
-- ⚠️ Only 1-2 months of data; cannot capture long-term trends
-- ⚠️ Not all users tracked all features (sleep, weight, heart rate)
-- ⚠️ Tracking days vary widely (4-31 days)
-
-**Include these caveats in your final presentation!**
-
----
-
-# PRIORITY ORDER FOR ANALYSIS
-
-## Must Do (High Impact) 🔥
-
-1. Data coverage exploration (feature utilization)
-2. User segmentation (activity level + engagement)
-3. Steps vs Calories correlation
-4. Hourly activity patterns (when are users active?)
-5. Weekday vs Weekend comparison
-
-## Should Do (Medium Impact) ⭐
-
-6. Day of week patterns
-7. Sleep analysis (for the 80% who have it)
-8. Weekly trend analysis
-9. Feature utilization rates & consistency
-
-## Nice to Have (Lower Priority but POSSIBLE) 💡
-
-### Heart Rate Deep Dive (heartrate_seconds_merged.csv)
-- Second-by-second heart rate patterns
-- Resting heart rate calculation
-- Heart rate variability
-- Heart rate zones during activity
-- Recovery heart rate after exercise
-
-### Weight Tracking Analysis (weightLogInfo_merged.csv)
-- Weight change trends (likely sparse)
-- Manual vs automatic logging patterns
-- BMI trends
-- Fat percentage analysis (if available)
-
-### Minute-Level Activity Patterns (6 minute-level files)
-- Granular activity bursts (when do 10+ minute active sessions occur?)
-- Sedentary break patterns (how long are sedentary bouts?)
-- Intensity patterns within hours
-- METs (Metabolic Equivalents) distribution
-- Sleep stage transitions (minuteSleep)
-
-### Advanced Temporal Analysis
-- Minute-by-minute activity heatmaps
-- Activity bout detection (continuous 10+ minute periods)
-- Sedentary bout detection (30+ minute periods)
-- Sleep interruption patterns (wake episodes)
-
-### Predictive Models
-- Linear regression models
-- Classification models for drop-off prediction
+*This analysis was conducted as part of the Google Data Analytics Capstone Project - Bellabeat Case Study*
