@@ -8,7 +8,7 @@ Analyze FitBit fitness tracker data from 30 users to understand activity pattern
 - **R**: tidyverse, dplyr, ggplot2, lubridate, forcats, vroom, janitor, here, readr, scales, broom
 - **Visualization**: ggplot2, heatmaps, scatter plots, boxplots, bar charts, line charts
 
-## 📂 Project Structure
+## Project Structure
 
 This outlines the main directories and files used in the Bellabeat analysis pipeline.
 
@@ -178,12 +178,12 @@ Bellabeat-Analysis/
 - **Retention**: Monitor user drop-off rates week-over-week
 
 ## Dataset Limitations
-- ⚠️ Small sample size (30 users) limits generalizability
-- ⚠️ Dataset from 2016 is outdated; trends may have changed
-- ⚠️ No demographic information (age, gender, location)
-- ⚠️ Only 1-2 months of data; cannot capture long-term trends
-- ⚠️ Not all users tracked all features consistently
-- ⚠️ Tracking days vary widely (4-31 days)
+-  Small sample size (30 users) limits generalizability
+-  Dataset from 2016 is outdated; trends may have changed
+-  No demographic information (age, gender, location)
+-  Only 1-2 months of data; cannot capture long-term trends
+-  Not all users tracked all features consistently
+-  Tracking days vary widely (4-31 days)
 
 ## Deliverables
 - **Cleaned Data**: 18 cleaned CSV files in `data/cleaned/`
